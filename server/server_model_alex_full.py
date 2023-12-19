@@ -72,13 +72,13 @@ def fc(x, w_value, b_value, activation_func=tf.nn.relu):
 
 def model(x_image, weight_vector):
 
-    _IMAGE_SIZE = 900
-    _NUM_CLASSES = 3
+    _IMAGE_SIZE = 600 #900
+    _NUM_CLASSES = 2 #3
 
     # layer 6
     with tf.name_scope('fc1layer'):
-        w_value = tf.reshape(weight_vector[0:270000],[900,300])
-        b_value = weight_vector[270000:270300]
+        w_value = tf.reshape(weight_vector[0:180000],[600,300])
+        b_value = weight_vector[180000:180300]
         fc1 = fc(x=x_image, w_value=w_value, b_value=b_value)
         # print(fc.w)
         #print('fc1:{}'.format(fc1.get_shape().as_list()))
@@ -87,8 +87,8 @@ def model(x_image, weight_vector):
 
     # layer 8 - output
     with tf.name_scope('fc2layer'):
-        w_value = tf.reshape(weight_vector[270300:271200],[300,_NUM_CLASSES])
-        b_value = weight_vector[271200:271203]
+        w_value = tf.reshape(weight_vector[180300:180900],[300,_NUM_CLASSES])
+        b_value = weight_vector[180900:180902]
         logits = fc(x=fc1, w_value=w_value, b_value=b_value, activation_func=None)
 
     with tf.variable_scope('softmax'):

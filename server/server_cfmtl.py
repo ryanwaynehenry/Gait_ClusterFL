@@ -4,6 +4,7 @@ import sys
 from threading import Lock, Thread
 import threading
 import numpy as np
+import pandas as pd
 from sklearn.decomposition import PCA
 # from server_model_alex_full import model
 from keras.utils import to_categorical
@@ -13,9 +14,9 @@ tf.disable_v2_behavior()
 from server_model_alex_full import model
 # np.set_printoptions(threshold=np.inf)
 
-NUM_OF_TOTAL_USERS = 7
-NUM_OF_WAIT = 7
-W_DIM = 271203 #751303 for 4 layers, 271203 for 2 layers
+NUM_OF_TOTAL_USERS = 8 #7
+NUM_OF_WAIT = 8 #7
+W_DIM = 180902 #181203 #271203 #751303 for 4 layers, 271203 for 2 layers
 inner_iteration = 3
 T_thresh = 10
 
@@ -38,11 +39,13 @@ loss_record = np.zeros(1000)
 normalized_dloss = np.zeros((NUM_OF_TOTAL_USERS,T_thresh))
 update_flag = np.ones(NUM_OF_TOTAL_USERS)
 
-NUM_OF_CLASS = 3
+NUM_OF_CLASS = 2
 softmax_temperature = 6.0
 
-server_x_test = np.loadtxt("server_x_test.txt")
-server_y_test = np.loadtxt("server_y_test.txt")
+server_x_test = np.loadtxt("serverTestX.csv", delimiter=',')
+df = pd.read_csv("serverTestY.csv", header=None)
+server_y_test = df.to_numpy()
+#server_y_test = np.loadtxt("serverTestY.csv", delimiter=',')
 
 
 
@@ -212,7 +215,7 @@ def reinitialize():
 	normalized_dloss[normalized_dloss<np.inf] = 0
 	iteration_count = 0
 	global NUM_OF_WAIT
-	NUM_OF_WAIT = 7
+	NUM_OF_WAIT = 8
 
 	global regular
 	regular = 1e5
@@ -252,7 +255,7 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
 				mess_type = self.request.recv(4)
 				mess_type = struct.unpack('i',mess_type)[0]
 
-				#print("This is the {}th node with message type {}".format(user_id[0],mess_type))
+				print("This is the {}th node with message type {}".format(user_id[0],mess_type))
 
 				#receive the body of message
 				recv_data = b""
@@ -353,6 +356,6 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
 
 
 if __name__ == "__main__":
-	HOST, PORT = "0.0.0.0", 9999 
+	HOST, PORT = "0.0.0.0", 5000
 	server = socketserver.ThreadingTCPServer((HOST,PORT),MyTCPHandler)
 	server.serve_forever(poll_interval = 0.5)

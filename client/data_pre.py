@@ -12,8 +12,8 @@ cluster_set = ['hsh_', 'mmw_']
 class_set = ['_walk','_up','_down']
 label = [0,1,2]
 
-NUM_OF_CLASS = 3
-DIMENSION_OF_FEATURE = 900
+NUM_OF_CLASS = 2 #3
+DIMENSION_OF_FEATURE = 600 #900
 
 
 def load_data(user_id):
@@ -35,7 +35,7 @@ def load_data(user_id):
 
 	for class_id in range(NUM_OF_CLASS):
 	
-		read_path = '/Users/ouyangxiaomin/Desktop/fed_datasets/imu_data_7/' + \
+		read_path = 'C:\\Users\\ryanw\PycharmProjects\ClusterFL\datasets\imu_dataset\imu_dataset\\' + \
 		cluster_des + str(intra_user_id) + str(class_set[class_id]) + '_nor' + '.txt'
 
 		temp_original_data = np.loadtxt(read_path,delimiter=',')

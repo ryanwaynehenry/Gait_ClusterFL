@@ -8,6 +8,8 @@ import numpy as np
 # from tensorflow.python.tools import inspect_checkpoint
 # import tensorflow.contrib as tf_contrib
 
+from tensorflow import compat
+
 def maxpool(x, ksize, strides, padding = "SAME"):
     """max-pooling layer"""
     return tf.nn.max_pool(x, 
@@ -45,8 +47,8 @@ def batch_norm(x, name, is_training):
         return tf_contrib.layers.batch_norm(x, center=True, scale=True, is_training=is_training, updates_collections=None)
 
 def model():
-    _IMAGE_SIZE = 900
-    _NUM_CLASSES = 3
+    _IMAGE_SIZE = 600 #900
+    _NUM_CLASSES = 2 #3
 
     with tf.variable_scope('teacher_alex'):
         # keepPro = 0.5

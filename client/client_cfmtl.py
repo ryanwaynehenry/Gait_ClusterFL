@@ -10,7 +10,8 @@ import sys
 import os
 from time import *
 import random
-import data_pre as data
+#import data_pre as data #use original data
+import data_pre_walking as data #use our data
 from sklearn.decomposition import PCA
 import math
 from tqdm import tqdm
@@ -19,22 +20,23 @@ from model_alex_full import model
 from keras.utils import to_categorical
 
 
+
 np.random.seed(0)
 tf.set_random_seed(0)
 config = tf.ConfigProto()
 
 current_user_id = int(sys.argv[1])
-NUM_OF_TOTAL_USERS = 7
+NUM_OF_TOTAL_USERS = 8 #1 #8 #7
 
 LOW_SCALE = 10
 HIGH_SCALE = 50
 train_N_set = np.random.randint(low=LOW_SCALE, high=HIGH_SCALE, size=NUM_OF_TOTAL_USERS)
-NUM_TRAIN_EXAMPLES_PER_USER = train_N_set[current_user_id]
-# NUM_TRAIN_EXAMPLES_PER_USER = 10
-NUM_TEST_EXAMPLES_PER_USER = 50
+#NUM_TRAIN_EXAMPLES_PER_USER = train_N_set[current_user_id]
+NUM_TRAIN_EXAMPLES_PER_USER = 24
+NUM_TEST_EXAMPLES_PER_USER = 5
 
-NUM_OF_CLASS = 3
-D_OF_DATA = 900
+NUM_OF_CLASS = 2 #3
+D_OF_DATA = 600 #900
 _BATCH_SIZE = 5
 
 # local_rho = 2*(1e-3)
@@ -51,9 +53,11 @@ decay = 0.999
 MODEL_INDICATE = 0
 
 loss_record = np.zeros(2000)
+test_accuracy_record = []
+test_loss_record = []
 
 # build the model and initialize the first training
-W_DIM = 271203#751303 for 4 layers, 271203 for 2 layers
+W_DIM = 180902 #181203 #271203#751303 for 4 layers, 271203 for 2 layers
 W = np.zeros(W_DIM)
 F = np.zeros((NUM_OF_TOTAL_USERS, NUM_OF_TOTAL_USERS))
 Omega = np.zeros((NUM_OF_TOTAL_USERS, W_DIM))
@@ -101,7 +105,6 @@ training_accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 with tf.name_scope('summaries'): 
   tf.summary.scalar('Training loss', finalloss)
 merged = tf.summary.merge_all()
-
 saver = tf.train.Saver()
 sess = tf.Session()
 train_writer = tf.summary.FileWriter(_SAVE_PATH, sess.graph)
@@ -128,44 +131,47 @@ def local_run(user_x_train, user_y_train, experiment_iter):
 		print("Epoch : " + str(epoch_i+1))
 
 		for s in tqdm(range(batch_size)):
+			batch_loss = []
+			batch_accuracy = []
 
 			batch_xs = train_x1[s*_BATCH_SIZE: (s+1)*_BATCH_SIZE]
 			batch_ys = train_y1[s*_BATCH_SIZE: (s+1)*_BATCH_SIZE]
  
-			summary, i_global, _, model_weight, train_learning_rate, batch_loss, batch_acc = sess.run(
+			summary, i_global, _, model_weight, train_learning_rate, batch_loss[s], batch_acc[s] = sess.run(
 			        [merged, global_step, optimizer, weights, local_learning_rate, finalloss, training_accuracy],
-			        feed_dict={x: batch_xs, y: batch_ys})
+			        feed_dict={x: batch_xs, y: batch_ys, F_i_tensor: F[current_user_id], Omega_tensor:Omega, U_tensor:U})
 			train_writer.add_summary(summary, i_global)
 
-		print("the training accuracy for epoch " + str(epoch_i+1)+ " loss: "+ str(batch_loss) + " accuracy: " + str(batch_acc*100))
+		print("the training accuracy for epoch " + str(epoch_i+1)+ " loss: "+ str(np.sum(batch_loss)) + " accuracy: " + str(np.mean(batch_acc)*100))
 		print(train_learning_rate)
 		print(i_global)
 
 	# saver.save(sess, save_path=_SAVE_PATH, global_step=i_global)
 
-	return w_flat, batch_loss
+	return w_flat, np.sum(batch_loss)
 
 def local_test(user_x_test, user_y_test, experiment_iter):
 
   # testing process
-  i = 0
-  test_data_len = user_x_test.shape[0]
-  predicted_class = np.zeros(shape=test_data_len, dtype=np.int)
-  while i < test_data_len:
-      j = min(i + _BATCH_SIZE, test_data_len)
-      test_batch_xs = user_x_test[i:j, :]
-      test_batch_ys = user_y_test[i:j, :]
-      predicted_class[i:j] = sess.run(
-          y_pred_cls,
-          feed_dict={x: test_batch_xs, y: test_batch_ys, is_training:False}
-      )
-      i = j
+	i = 0
+	test_data_len = user_x_test.shape[0]
+	predicted_class = np.zeros(shape=test_data_len, dtype=np.int)
+	test_loss = []
+	while i < test_data_len:
+	  j = min(i + _BATCH_SIZE, test_data_len)
+	  test_batch_xs = user_x_test[i:j, :]
+	  test_batch_ys = user_y_test[i:j, :]
+	  predicted_class[i:j], final_loss= sess.run(
+		  [y_pred_cls, finalloss],
+		  feed_dict={x: test_batch_xs, y: test_batch_ys, F_i_tensor: F[current_user_id], Omega_tensor:Omega, U_tensor:U, is_training:False})
+	  test_loss.append(final_loss)
+	  i = j
 
-  correct = (np.argmax(user_y_test, axis=1) == predicted_class)
-  test_acc = correct.mean()#*100
-  correct_numbers = correct.sum()
+	correct = (np.argmax(user_y_test, axis=1) == predicted_class)
+	test_acc = correct.mean()#*100
+	correct_numbers = correct.sum()
 
-  return test_acc
+	return test_acc, np.sum(test_loss)
 
 #load data and pre-process
 x_coll, y_coll, dimension = data.load_data(current_user_id)
@@ -181,7 +187,7 @@ print(y_test.shape)
 
 #prepare the communication module
 server_addr = "localhost"
-server_port = 9999
+server_port = 5000
 comm = COMM(server_addr,server_port,current_user_id)
 
 comm.send2server('hello',-1)
@@ -190,6 +196,7 @@ print(comm.recvfserver())
 
 outer_i = 0
 sig_stop = 0
+
 
 while True:
 
@@ -200,19 +207,23 @@ while True:
 		train_x1, train_y1 = shuffle_training_data(x_train, y_train)
 		print("Epoch : " + str(outer_i*local_iter + epoch_i+1))
 
+		batch_acc = np.zeros([batch_size, 1])
+		batch_loss = np.zeros([batch_size, 1])
+
 		for s in tqdm(range(batch_size)):
+
 
 			batch_xs = train_x1[s*_BATCH_SIZE: (s+1)*_BATCH_SIZE]
 			batch_ys = train_y1[s*_BATCH_SIZE: (s+1)*_BATCH_SIZE]
  
-			summary, i_global, _, model_weight, batch_loss, batch_acc = sess.run(
+			summary, i_global, _, model_weight, batch_loss[s], batch_acc[s] = sess.run(
 			        [merged, global_step, optimizer, weights, finalloss, training_accuracy],
 			        feed_dict={x: batch_xs, y: batch_ys,
 			        F_i_tensor: F[current_user_id], Omega_tensor:Omega, U_tensor:U})
 			train_writer.add_summary(summary, i_global)
 
-		print("the training accuracy for epoch " + str(outer_i*local_iter + epoch_i+1)+ " loss: "+ str(batch_loss) + " accuracy: " + str(batch_acc*100))
-		loss_record[outer_i*local_iter + epoch_i + 1] = batch_loss
+		print("the training accuracy for epoch " + str(outer_i*local_iter + epoch_i+1)+ " loss: "+ str(np.sum(batch_loss)) + " accuracy: " + str(np.mean(batch_acc)*100))
+		loss_record[outer_i*local_iter + epoch_i] = np.sum(batch_loss)
 
 	#get the weights and send to server
 	w_flat = np.array([])
@@ -220,7 +231,7 @@ while True:
 		temp = model_weight[i].reshape(-1)
 		w_flat = np.append(w_flat,temp)
 
-	local_loss = batch_loss
+	local_loss = np.sum(batch_loss)
 
 	comm.send2server(w_flat,0)
 
@@ -237,9 +248,10 @@ while True:
 		np.savetxt("F.txt", F)
 		break
 
-local_accuracy = local_test(x_test, y_test, MODEL_INDICATE)
-print("clusterfl node %d: "%(current_user_id), local_accuracy)
-loss_record[0] = local_accuracy
+test_accuracy, test_loss = local_test(x_test, y_test, MODEL_INDICATE)
+print("clusterfl node %d: "%(current_user_id), test_accuracy)
+test_accuracy_record.append(test_accuracy)
+#test_loss_record.append(test_loss)
 
 comm.disconnect(1)
 sess.close()
